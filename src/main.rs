@@ -90,6 +90,42 @@ impl Projectile {
     }
 }
 
+enum UpgradeType {
+    Damage,
+    Projectiles,
+    SlowTrap,
+    Health,
+    Speed,
+}
+
+struct UpgradeGate {
+    pos: Vec2,
+    upgrade_type: UpgradeType,
+    width: f32,
+    height: f32,
+    lifetime: f32,
+}
+
+impl UpgradeGate {
+    fn new(pos: Vec2, upgrade_type: UpgradeType) -> Self {
+        Self {
+            pos,
+            upgrade_type,
+            width: 60.0,
+            height: 80.0,
+            lifetime: 15.0,
+        }
+    }
+
+    fn update(&mut self, dt: f32) {
+        self.lifetime -= dt;
+    }
+
+    fn is_alive(&self) -> bool {
+        self.lifetime > 0.0
+    }
+}
+
 fn find_closest_enemy(player_pos: Vec2, enemies: &[Enemy]) -> Option<Vec2> {
     if enemies.is_empty() {
         return None;

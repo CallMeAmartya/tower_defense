@@ -26,11 +26,6 @@ impl Player {
         self.pos.y = self.pos.y.clamp(self.radius, screen_height() - self.radius);
     }
 
-    // take damage
-    fn take_hit(&mut self) {
-        self.health -= 1.0;
-    }
-
     // draw player
     fn draw(&self) {
         draw_circle(self.pos.x, self.pos.y, self.radius, GREEN);
@@ -56,9 +51,8 @@ impl Enemy {
         draw_circle(self.pos.x, self.pos.y, self.radius, RED);
     }
 
-    // check for collision
-    fn collision(&self, player_pos: Vec2, player_radius: f32) -> bool {
-        self.pos.distance(player_pos) < self.radius + player_radius
+    fn is_alive(&self) -> bool {
+        self.health > 0.0
     }
 }
 
@@ -84,6 +78,11 @@ impl Projectile {
             Color::from_rgba(255, 255, 100, 100),
         );
         draw_circle(self.pos.x, self.pos.y, self.radius, YELLOW);
+    }
+
+    fn hits(&self, enemy: &Enemy) -> bool {
+        let distance = (self.pos - enemy.pos).length();
+        distance < self.radius + enemy.radius
     }
 
     fn is_alive(&self) -> bool {
@@ -134,27 +133,29 @@ fn spawn_enemy() -> Enemy {
 
 #[macroquad::main("TowerDefense")]
 async fn main() {
-    // define starting pos
-    let start_x: f32 = 400.0;
-    let start_y: f32 = 300.0;
-
-    let mut projectiles: Vec<Projectile> = Vec::new();
-    let mut attack_timer = 0.0;
-    let attack_cooldown = 0.4;
-    let projectile_speed = 400.0;
-    let projectile_damage = 10.0;
-
     // create player
     let mut player = Player {
-        pos: Vec2::new(start_x, start_y),
+        pos: Vec2::new(screen_width() / 2.0, screen_height() / 2.0),
         speed: 200.0,
         health: 100.0,
         radius: 20.0,
     };
 
     let mut enemies: Vec<Enemy> = Vec::new();
+    let mut projectiles: Vec<Projectile> = Vec::new();
+
+    // define projectiles propertiers
+    let mut attack_timer = 0.0;
+    let attack_cooldown = 0.4;
+    let projectile_speed = 400.0;
+    let projectile_damage = 0.0;
+
+    // enemy properties
     let mut spawn_timer = 0.0;
     let mut spawn_interval = 2.0;
+
+    // score
+    let mut score: u32 = 0;
 
     loop {
         let dt = get_frame_time();
@@ -199,36 +200,73 @@ async fn main() {
             projectile.update(dt);
         }
 
+        // collision
+        for proj in &mut projectiles {
+            for enemy in &mut enemies {
+                if proj.hits(enemy) {
+                    enemy.health -= proj.damage;
+                    proj.lifetime = 0.0; // Mark projectile for removal
+                    break; // This projectile can only hit one enemy
+                }
+            }
+        }
+
+        for enemy in &enemies {
+            let dist = (enemy.pos - player.pos).length();
+            if dist < enemy.radius + player.radius {
+                player.health -= 20.0 * dt;
+            }
+        }
+
+        // remove dead projectiles
+        projectiles.retain(|projectile| projectile.is_alive());
+
+        // count enemies before removing dead enemies
+        let enemy_count_before = enemies.len();
+
+        // remove dead enemies
+        enemies.retain(|enemy| enemy.is_alive());
+
+        // update score
+        let kills = enemy_count_before - enemies.len();
+        score += kills as u32 * 10; // 10 points per kill
+
+        // check game over
+        if player.health <= 0.0 {
+            player.health = 100.0;
+            player.pos = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
+            enemies.clear();
+            score = 0;
+        }
+
         // draw frame, player, enemies and projectiles
         clear_background(Color::from_rgba(20, 20, 30, 225));
         player.draw();
         for enemy in &enemies {
             enemy.draw();
-            if enemy.collision(player.pos, player.radius) {
-                player.take_hit();
-            }
         }
         for projectile in &projectiles {
             projectile.draw();
         }
 
         // HUD
-        draw_text("Tower Defense", 20.0, 40.0, 40.0, WHITE);
-        draw_text("Press SPACE to start", 20.0, 80.0, 20.0, GRAY);
+        // draw_text("Tower Defense", 20.0, 40.0, 40.0, WHITE);
+        // draw_text("Press SPACE to start", 20.0, 80.0, 20.0, GRAY);
         draw_text(
             &format!("Health: {}", player.health),
-            start_x,
-            start_y + 100.0,
+            screen_width() - 120.0,
+            screen_height() - 40.0,
             24.0,
             WHITE,
         );
         draw_text(
             &format!("Pos: ({:.0}, {:.0})", player.pos.x, player.pos.y),
-            start_x,
-            start_y + 150.0,
+            screen_width() - 120.0,
+            screen_height() - 20.0,
             16.0,
             GRAY,
         );
+        draw_text(&format!("Score: {}", score), 20.0, 30.0, 24.0, WHITE);
 
         // wait for next frame
         next_frame().await

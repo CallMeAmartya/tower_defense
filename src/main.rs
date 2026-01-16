@@ -38,10 +38,24 @@ struct Player {
     max_health: f32,
     damage: f32,
     projectile_count: u32,
+    projectile_speed: f32,
     radius: f32,
 }
 
 impl Player {
+    // create player
+    fn new() -> Self {
+        Self {
+            pos: Vec2::new(screen_width() / 2.0, screen_height() / 2.0),
+            speed: 200.0,
+            health: 100.0,
+            max_health: 100.0,
+            damage: 5.0,
+            projectile_count: 1,
+            projectile_speed: 200.0,
+            radius: 20.0,
+        }
+    }
     // update player
     fn update(&mut self, dt: f32) {
         if is_key_down(KeyCode::A) {
@@ -166,7 +180,7 @@ impl UpgradeGate {
             health,
             width: 60.0,
             height: 80.0,
-            lifetime: 15.0,
+            lifetime: 4.0,
         }
     }
 
@@ -352,102 +366,255 @@ fn start_wave(wave: u32) -> u32 {
     10 + (wave.pow(2))
 }
 
+fn draw_menu(theme: &Theme) {
+    clear_background(Color::from_rgba(15, 20, 30, 255));
+
+    // Title
+    let title = theme.game_title;
+    let title_width = measure_text(title, None, 64, 1.0).width;
+    draw_text(
+        title,
+        screen_width() / 2.0 - title_width / 2.0,
+        screen_height() / 3.0,
+        64.0,
+        theme.player_color,
+    );
+
+    // Subtitle
+    let subtitle = "Defend the Arctic!";
+    let sub_width = measure_text(subtitle, None, 28, 1.0).width;
+    draw_text(
+        subtitle,
+        screen_width() / 2.0 - sub_width / 2.0,
+        screen_height() / 3.0 + 50.0,
+        28.0,
+        WHITE,
+    );
+
+    // Pulsing "Press SPACE" text
+    let pulse = ((get_time() * 2.0).sin() as f32 * 0.3 + 0.7);
+    let instruction = "Press SPACE to start";
+    let inst_width = measure_text(instruction, None, 24, 1.0).width;
+    draw_text(
+        instruction,
+        screen_width() / 2.0 - inst_width / 2.0,
+        screen_height() * 0.6,
+        24.0,
+        Color::new(1.0, 1.0, 1.0, pulse),
+    );
+
+    // Controls
+    draw_text(
+        "WASD to move",
+        screen_width() / 2.0 - 60.0,
+        screen_height() * 0.75,
+        18.0,
+        GRAY,
+    );
+    draw_text(
+        "Run through gates for upgrades!",
+        screen_width() / 2.0 - 120.0,
+        screen_height() * 0.75 + 25.0,
+        18.0,
+        GRAY,
+    );
+}
+
+fn draw_game_over(score: u32, wave: u32, theme: &Theme) {
+    // Darken background
+    draw_rectangle(
+        0.0,
+        0.0,
+        screen_width(),
+        screen_height(),
+        Color::from_rgba(0, 0, 0, 200),
+    );
+
+    // Game Over text
+    let title = "GAME OVER";
+    let title_width = measure_text(title, None, 64, 1.0).width;
+    draw_text(
+        title,
+        screen_width() / 2.0 - title_width / 2.0,
+        screen_height() / 3.0,
+        64.0,
+        RED,
+    );
+
+    // Stats
+    draw_text(
+        &format!("Score: {}", score),
+        screen_width() / 2.0 - 80.0,
+        screen_height() / 2.0,
+        32.0,
+        WHITE,
+    );
+    draw_text(
+        &format!("Waves Survived: {}", wave.saturating_sub(1)),
+        screen_width() / 2.0 - 100.0,
+        screen_height() / 2.0 + 40.0,
+        24.0,
+        LIGHTGRAY,
+    );
+
+    // Restart prompt
+    let pulse = ((get_time() * 2.0).sin() as f32 * 0.3 + 0.7);
+    draw_text(
+        "Press SPACE to restart",
+        screen_width() / 2.0 - 120.0,
+        screen_height() * 0.75,
+        24.0,
+        Color::new(1.0, 1.0, 1.0, pulse),
+    );
+}
+
+fn draw_hud(player: &Player, wave: u32, score: u32, theme: &Theme) {
+    // Wave & Score
+    draw_text(&format!("Wave {}", wave), 20.0, 35.0, 32.0, WHITE);
+    draw_text(&format!("Score: {}", score), 20.0, 60.0, 20.0, LIGHTGRAY);
+
+    // Player stats (top right)
+    let x = screen_width() - 180.0;
+    draw_text(
+        &format!("DMG: {:.0}", player.damage),
+        x,
+        35.0,
+        18.0,
+        Color::from_rgba(255, 150, 100, 255),
+    );
+    draw_text(
+        &format!("Shots: {}", player.projectile_count),
+        x,
+        55.0,
+        18.0,
+        Color::from_rgba(100, 200, 255, 255),
+    );
+    draw_text(
+        &format!("Speed: {:.0}", player.speed),
+        x,
+        75.0,
+        18.0,
+        Color::from_rgba(255, 255, 100, 255),
+    );
+
+    // Health bar (bottom of screen)
+    let bar_width = 200.0;
+    let bar_height = 20.0;
+    let bar_x = screen_width() / 2.0 - bar_width / 2.0;
+    let bar_y = screen_height() - 40.0;
+    let health_pct = (player.health / player.max_health).clamp(0.0, 1.0);
+
+    draw_rectangle(
+        bar_x,
+        bar_y,
+        bar_width,
+        bar_height,
+        Color::from_rgba(40, 40, 40, 200),
+    );
+
+    let health_color = if health_pct > 0.5 {
+        GREEN
+    } else if health_pct > 0.25 {
+        ORANGE
+    } else {
+        RED
+    };
+    draw_rectangle(
+        bar_x,
+        bar_y,
+        bar_width * health_pct,
+        bar_height,
+        health_color,
+    );
+    draw_rectangle_lines(bar_x, bar_y, bar_width, bar_height, 2.0, WHITE);
+
+    // Health text
+    draw_text(
+        &format!("{:.0}/{:.0}", player.health, player.max_health),
+        bar_x + bar_width / 2.0 - 30.0,
+        bar_y + 15.0,
+        16.0,
+        WHITE,
+    );
+}
+
+fn fire_projectiles(player: &Player, target_pos: Vec2, projectiles: &mut Vec<Projectile>) {
+    // calculate direction to target
+    let base_direction = (target_pos - player.pos).normalize_or_zero();
+
+    // spread angle between projectiles
+    let spread = 0.2;
+    let total_spread = spread * (player.projectile_count - 1) as f32;
+    let start_angle = -total_spread / 2.0;
+
+    for i in 0..player.projectile_count {
+        let angle = start_angle + spread * i as f32;
+
+        // rotate direnction by angle
+        let direction = Vec2::new(
+            base_direction.x * angle.cos() - base_direction.y * angle.sin(),
+            base_direction.x * angle.sin() + base_direction.y * angle.cos(),
+        );
+        // create projectile
+        projectiles.push(Projectile {
+            pos: player.pos,
+            velocity: direction * player.projectile_speed,
+            damage: player.damage,
+            radius: 6.0,
+            lifetime: 2.0,
+        });
+    }
+}
+
 #[macroquad::main("TowerDefense")]
 async fn main() {
+    let theme = VIKING_RUSH_THEME;
     let mut game_state = GameState::Menu;
-    // create player
-    let mut player = Player {
-        pos: Vec2::new(screen_width() / 2.0, screen_height() / 2.0),
-        speed: 200.0,
-        health: 100.0,
-        max_health: 100.0,
-        damage: 5.0,
-        projectile_count: 1,
-        radius: 20.0,
-    };
 
+    // Game objects
+    let mut player = Player::new();
     let mut enemies: Vec<Enemy> = Vec::new();
     let mut projectiles: Vec<Projectile> = Vec::new();
     let mut upgrade_gates: Vec<UpgradeGate> = Vec::new();
 
-    // define projectiles propertiers
+    // Game stats
+    let mut wave: u32 = 0;
+    let mut score: u32 = 0;
+    let mut enemies_to_spawn: u32 = 0;
+
+    // Timers
+    let mut spawn_timer = 0.0;
+    let mut spawn_interval = 0.0;
     let mut attack_timer = 0.0;
     let attack_cooldown = 0.4;
-    let projectile_speed = 400.0;
-
-    // enemy properties
-    let mut spawn_timer = 0.0;
-    let mut spawn_interval = 2.0;
-
-    // upgrade gate properties
     let mut gate_spawn_timer = 0.0;
-    let mut gate_spawn_interval = 5.0;
-    let mut score: u32 = 0;
-
-    // enemy waves
-    let mut wave: u32 = 0;
-    let mut enemies_to_spawn: u32 = 0;
-    let mut wave_active: bool = false;
+    let gate_spawn_interval = 7.0;
 
     loop {
         let dt = get_frame_time();
 
         match game_state {
             GameState::Menu => {
-                // Draw Menu, Check for start
-                draw_text(
-                    "Tower Defense",
-                    screen_width() / 2.0,
-                    screen_height() / 2.0,
-                    40.0,
-                    WHITE,
-                );
-                draw_text(
-                    "Press SPACE to start",
-                    screen_width() / 2.0,
-                    screen_height() / 2.0 + 30.0,
-                    20.0,
-                    GRAY,
-                );
                 if is_key_pressed(KeyCode::Space) {
+                    // start game
                     game_state = GameState::Playing;
-                    // create player
-                    player = Player {
-                        pos: Vec2::new(screen_width() / 2.0, screen_height() / 2.0),
-                        speed: 200.0,
-                        health: 100.0,
-                        max_health: 100.0,
-                        damage: 5.0,
-                        projectile_count: 1,
-                        radius: 20.0,
-                    };
+                    player = Player::new();
+                    enemies.clear();
+                    projectiles.clear();
+                    upgrade_gates.clear();
 
-                    enemies = Vec::new();
-                    projectiles = Vec::new();
-                    upgrade_gates = Vec::new();
-
-                    // define projectiles propertiers
-                    attack_timer = 0.0;
-
-                    // enemy properties
-                    spawn_timer = 0.0;
-                    spawn_interval = 2.0;
-
-                    // upgrade gate properties
-                    gate_spawn_timer = 0.0;
-                    gate_spawn_interval = 5.0;
-
-                    // score
+                    wave = 0;
                     score = 0;
                 }
+
+                draw_menu(&theme);
             }
 
             GameState::Playing => {
                 // start a new wave if needed
-                if !wave_active || (enemies.is_empty() && enemies_to_spawn == 0) {
+                if enemies.is_empty() && enemies_to_spawn == 0 {
                     wave += 1;
                     enemies_to_spawn = start_wave(wave);
-                    wave_active = true;
                     spawn_timer = 0.0;
                     spawn_interval = 30.0 / (enemies_to_spawn as f32);
                 }
@@ -462,7 +629,7 @@ async fn main() {
 
                 // spawn upgrade gates
                 gate_spawn_timer += dt;
-                if gate_spawn_timer >= gate_spawn_interval && upgrade_gates.len() < 3 {
+                if gate_spawn_timer >= gate_spawn_interval && upgrade_gates.len() < 2 {
                     upgrade_gates.push(spawn_upgrade_gate());
                     gate_spawn_timer = 0.0;
                 }
@@ -472,31 +639,7 @@ async fn main() {
                 if attack_timer >= attack_cooldown {
                     // find target
                     if let Some(target_pos) = find_closest_enemy(player.pos, &enemies) {
-                        // calculate direction to target
-                        let base_direction = (target_pos - player.pos).normalize_or_zero();
-
-                        // spread angle between projectiles
-                        let spread = 0.2;
-                        let total_spread = spread * (player.projectile_count - 1) as f32;
-                        let start_angle = -total_spread / 2.0;
-
-                        for i in 0..player.projectile_count {
-                            let angle = start_angle + spread * i as f32;
-
-                            // rotate direnction by angle
-                            let direction = Vec2::new(
-                                base_direction.x * angle.cos() - base_direction.y * angle.sin(),
-                                base_direction.x * angle.sin() + base_direction.y * angle.cos(),
-                            );
-                            // create projectile
-                            projectiles.push(Projectile {
-                                pos: player.pos,
-                                velocity: direction * projectile_speed,
-                                damage: player.damage,
-                                radius: 6.0,
-                                lifetime: 2.0,
-                            });
-                        }
+                        fire_projectiles(&player, target_pos, &mut projectiles);
                         attack_timer = 0.0;
                     }
                 }
@@ -566,7 +709,7 @@ async fn main() {
                 }
 
                 // draw frame, player, enemies, gates and projectiles
-                clear_background(Color::from_rgba(20, 20, 30, 225));
+                clear_background(Color::from_rgba(15, 20, 30, 255));
                 player.draw();
                 for enemy in &enemies {
                     enemy.draw();
@@ -579,52 +722,14 @@ async fn main() {
                 }
 
                 // HUD
-                draw_text(
-                    &format!("Health: {}", player.health),
-                    screen_width() - 120.0,
-                    screen_height() - 40.0,
-                    24.0,
-                    WHITE,
-                );
-                draw_text(
-                    &format!("Pos: ({:.0}, {:.0})", player.pos.x, player.pos.y),
-                    screen_width() - 120.0,
-                    screen_height() - 20.0,
-                    16.0,
-                    GRAY,
-                );
-                draw_text(&format!("Score: {}", score), 20.0, 30.0, 24.0, WHITE);
+                draw_hud(&player, wave, score, &theme);
             }
 
             GameState::GameOver => {
-                draw_text(
-                    "Game Over",
-                    screen_width() / 2.0,
-                    screen_height() / 2.0,
-                    40.0,
-                    WHITE,
-                );
-                draw_text(
-                    &format!("Score: {}", score),
-                    screen_width() / 2.0,
-                    screen_height() / 2.0 + 30.0,
-                    20.0,
-                    GRAY,
-                );
-                draw_text(
-                    "Press SPACE to go back to menu",
-                    screen_width() / 2.0,
-                    screen_height() / 2.0 + 60.0,
-                    20.0,
-                    GRAY,
-                );
                 if is_key_pressed(KeyCode::Space) {
                     game_state = GameState::Menu;
-                    player.health = 100.0;
-                    player.pos = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
-                    enemies.clear();
-                    score = 0;
                 }
+                draw_game_over(score, wave, &theme);
             }
         }
 

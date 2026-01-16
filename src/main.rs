@@ -1,5 +1,12 @@
 use macroquad::prelude::*;
 
+#[derive(PartialEq)]
+enum GameState {
+    Menu,
+    Playing,
+    GameOver,
+}
+
 struct Player {
     pos: Vec2,
     speed: f32,
@@ -315,6 +322,7 @@ fn apply_upgrade(upgrade_type: &UpgradeType, player: &mut Player, enemies: &mut 
 
 #[macroquad::main("TowerDefense")]
 async fn main() {
+    let mut game_state = GameState::Menu;
     // create player
     let mut player = Player {
         pos: Vec2::new(screen_width() / 2.0, screen_height() / 2.0),
@@ -334,7 +342,6 @@ async fn main() {
     let mut attack_timer = 0.0;
     let attack_cooldown = 0.4;
     let projectile_speed = 400.0;
-    let projectile_damage = 0.0;
 
     // enemy properties
     let mut spawn_timer = 0.0;
@@ -343,160 +350,237 @@ async fn main() {
     // upgrade gate properties
     let mut gate_spawn_timer = 0.0;
     let mut gate_spawn_interval = 5.0;
-
-    // score
     let mut score: u32 = 0;
 
     loop {
         let dt = get_frame_time();
 
-        // spawn enemies
-        spawn_timer += dt;
-        if enemies.len() < 20 && spawn_timer >= spawn_interval {
-            enemies.push(spawn_enemy());
-            spawn_timer = 0.0;
-            spawn_interval -= 0.005;
-        }
+        match game_state {
+            GameState::Menu => {
+                // Draw Menu, Check for start
+                draw_text(
+                    "Tower Defense",
+                    screen_width() / 2.0,
+                    screen_height() / 2.0,
+                    40.0,
+                    WHITE,
+                );
+                draw_text(
+                    "Press SPACE to start",
+                    screen_width() / 2.0,
+                    screen_height() / 2.0 + 30.0,
+                    20.0,
+                    GRAY,
+                );
+                if is_key_pressed(KeyCode::Space) {
+                    game_state = GameState::Playing;
+                    // create player
+                    player = Player {
+                        pos: Vec2::new(screen_width() / 2.0, screen_height() / 2.0),
+                        speed: 200.0,
+                        health: 100.0,
+                        max_health: 100.0,
+                        damage: 5.0,
+                        projectile_count: 1,
+                        radius: 20.0,
+                    };
 
-        // spawn upgrade gates
-        gate_spawn_timer += dt;
-        if gate_spawn_timer >= gate_spawn_interval && upgrade_gates.len() < 3 {
-            upgrade_gates.push(spawn_upgrade_gate());
-            gate_spawn_timer = 0.0;
-        }
+                    enemies = Vec::new();
+                    projectiles = Vec::new();
+                    upgrade_gates = Vec::new();
 
-        // auto attack
-        attack_timer += dt;
-        if attack_timer >= attack_cooldown {
-            // find target
-            if let Some(target_pos) = find_closest_enemy(player.pos, &enemies) {
-                // calculate direction to target
-                let base_direction = (target_pos - player.pos).normalize_or_zero();
+                    // define projectiles propertiers
+                    attack_timer = 0.0;
 
-                // spread angle between projectiles
-                let spread = 0.2;
-                let total_spread = spread * (player.projectile_count - 1) as f32;
-                let start_angle = -total_spread / 2.0;
+                    // enemy properties
+                    spawn_timer = 0.0;
+                    spawn_interval = 2.0;
 
-                for i in 0..player.projectile_count {
-                    let angle = start_angle + spread * i as f32;
+                    // upgrade gate properties
+                    gate_spawn_timer = 0.0;
+                    gate_spawn_interval = 5.0;
 
-                    // rotate direnction by angle
-                    let direction = Vec2::new(
-                        base_direction.x * angle.cos() - base_direction.y * angle.sin(),
-                        base_direction.x * angle.sin() + base_direction.y * angle.cos(),
-                    );
-                    // create projectile
-                    projectiles.push(Projectile {
-                        pos: player.pos,
-                        velocity: direction * projectile_speed,
-                        damage: player.damage,
-                        radius: 6.0,
-                        lifetime: 2.0,
-                    });
-                }
-                attack_timer = 0.0;
-            }
-        }
-
-        // update enemy pos
-        for enemy in &mut enemies {
-            enemy.update(player.pos, dt);
-        }
-
-        // update player pos
-        player.update(dt);
-
-        // update gates
-        for gate in &mut upgrade_gates {
-            gate.update(dt);
-        }
-
-        // update projectile
-        for projectile in &mut projectiles {
-            projectile.update(dt);
-        }
-
-        // collision
-        for proj in &mut projectiles {
-            for enemy in &mut enemies {
-                if proj.hits(enemy) {
-                    enemy.health -= proj.damage;
-                    proj.lifetime = 0.0; // Mark projectile for removal
-                    break; // This projectile can only hit one enemy
+                    // score
+                    score = 0;
                 }
             }
-        }
 
-        for enemy in &enemies {
-            let dist = (enemy.pos - player.pos).length();
-            if dist < enemy.radius + player.radius {
-                player.health -= 20.0 * dt;
+            GameState::Playing => {
+                // spawn enemies
+                spawn_timer += dt;
+                if enemies.len() < 20 && spawn_timer >= spawn_interval {
+                    enemies.push(spawn_enemy());
+                    spawn_timer = 0.0;
+                    spawn_interval -= 0.005;
+                }
+
+                // spawn upgrade gates
+                gate_spawn_timer += dt;
+                if gate_spawn_timer >= gate_spawn_interval && upgrade_gates.len() < 3 {
+                    upgrade_gates.push(spawn_upgrade_gate());
+                    gate_spawn_timer = 0.0;
+                }
+
+                // auto attack
+                attack_timer += dt;
+                if attack_timer >= attack_cooldown {
+                    // find target
+                    if let Some(target_pos) = find_closest_enemy(player.pos, &enemies) {
+                        // calculate direction to target
+                        let base_direction = (target_pos - player.pos).normalize_or_zero();
+
+                        // spread angle between projectiles
+                        let spread = 0.2;
+                        let total_spread = spread * (player.projectile_count - 1) as f32;
+                        let start_angle = -total_spread / 2.0;
+
+                        for i in 0..player.projectile_count {
+                            let angle = start_angle + spread * i as f32;
+
+                            // rotate direnction by angle
+                            let direction = Vec2::new(
+                                base_direction.x * angle.cos() - base_direction.y * angle.sin(),
+                                base_direction.x * angle.sin() + base_direction.y * angle.cos(),
+                            );
+                            // create projectile
+                            projectiles.push(Projectile {
+                                pos: player.pos,
+                                velocity: direction * projectile_speed,
+                                damage: player.damage,
+                                radius: 6.0,
+                                lifetime: 2.0,
+                            });
+                        }
+                        attack_timer = 0.0;
+                    }
+                }
+
+                // update enemy pos
+                for enemy in &mut enemies {
+                    enemy.update(player.pos, dt);
+                }
+
+                // update player pos
+                player.update(dt);
+
+                // update gates
+                for gate in &mut upgrade_gates {
+                    gate.update(dt);
+                }
+
+                // update projectile
+                for projectile in &mut projectiles {
+                    projectile.update(dt);
+                }
+
+                // collision
+                for proj in &mut projectiles {
+                    for enemy in &mut enemies {
+                        if proj.hits(enemy) {
+                            enemy.health -= proj.damage;
+                            proj.lifetime = 0.0; // Mark projectile for removal
+                            break; // This projectile can only hit one enemy
+                        }
+                    }
+                }
+
+                for enemy in &enemies {
+                    let dist = (enemy.pos - player.pos).length();
+                    if dist < enemy.radius + player.radius {
+                        player.health -= 20.0 * dt;
+                    }
+                }
+
+                for gate in &mut upgrade_gates {
+                    if gate.is_alive() && gate.check_collision(player.pos, player.radius) {
+                        apply_upgrade(&gate.upgrade_type, &mut player, &mut enemies);
+                        gate.lifetime = 0.0;
+                    }
+                }
+
+                // remove dead projectiles
+                projectiles.retain(|projectile| projectile.is_alive());
+
+                // count enemies before removing dead enemies
+                let enemy_count_before = enemies.len();
+
+                // remove dead enemies
+                enemies.retain(|enemy| enemy.is_alive());
+
+                // remove gate
+                upgrade_gates.retain(|gate| gate.is_alive());
+
+                // update score
+                let kills = enemy_count_before - enemies.len();
+                score += kills as u32 * 10; // 10 points per kill
+
+                // check game over
+                if player.health <= 0.0 {
+                    game_state = GameState::GameOver;
+                }
+
+                // draw frame, player, enemies, gates and projectiles
+                clear_background(Color::from_rgba(20, 20, 30, 225));
+                player.draw();
+                for enemy in &enemies {
+                    enemy.draw();
+                }
+                for projectile in &projectiles {
+                    projectile.draw();
+                }
+                for gate in &upgrade_gates {
+                    gate.draw();
+                }
+
+                // HUD
+                draw_text(
+                    &format!("Health: {}", player.health),
+                    screen_width() - 120.0,
+                    screen_height() - 40.0,
+                    24.0,
+                    WHITE,
+                );
+                draw_text(
+                    &format!("Pos: ({:.0}, {:.0})", player.pos.x, player.pos.y),
+                    screen_width() - 120.0,
+                    screen_height() - 20.0,
+                    16.0,
+                    GRAY,
+                );
+                draw_text(&format!("Score: {}", score), 20.0, 30.0, 24.0, WHITE);
+            }
+
+            GameState::GameOver => {
+                draw_text(
+                    "Game Over",
+                    screen_width() / 2.0,
+                    screen_height() / 2.0,
+                    40.0,
+                    WHITE,
+                );
+                draw_text(
+                    &format!("Score: {}", score),
+                    screen_width() / 2.0,
+                    screen_height() / 2.0 + 30.0,
+                    20.0,
+                    GRAY,
+                );
+                draw_text(
+                    "Press SPACE to go back to menu",
+                    screen_width() / 2.0,
+                    screen_height() / 2.0 + 60.0,
+                    20.0,
+                    GRAY,
+                );
+                if is_key_pressed(KeyCode::Space) {
+                    game_state = GameState::Menu;
+                    player.health = 100.0;
+                    player.pos = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
+                    enemies.clear();
+                    score = 0;
+                }
             }
         }
-
-        for gate in &mut upgrade_gates {
-            if gate.is_alive() && gate.check_collision(player.pos, player.radius) {
-                apply_upgrade(&gate.upgrade_type, &mut player, &mut enemies);
-                gate.lifetime = 0.0;
-            }
-        }
-
-        // remove dead projectiles
-        projectiles.retain(|projectile| projectile.is_alive());
-
-        // count enemies before removing dead enemies
-        let enemy_count_before = enemies.len();
-
-        // remove dead enemies
-        enemies.retain(|enemy| enemy.is_alive());
-
-        // remove gate
-        upgrade_gates.retain(|gate| gate.is_alive());
-
-        // update score
-        let kills = enemy_count_before - enemies.len();
-        score += kills as u32 * 10; // 10 points per kill
-
-        // check game over
-        if player.health <= 0.0 {
-            player.health = 100.0;
-            player.pos = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
-            enemies.clear();
-            score = 0;
-        }
-
-        // draw frame, player, enemies, gates and projectiles
-        clear_background(Color::from_rgba(20, 20, 30, 225));
-        player.draw();
-        for enemy in &enemies {
-            enemy.draw();
-        }
-        for projectile in &projectiles {
-            projectile.draw();
-        }
-        for gate in &upgrade_gates {
-            gate.draw();
-        }
-
-        // HUD
-        // draw_text("Tower Defense", 20.0, 40.0, 40.0, WHITE);
-        // draw_text("Press SPACE to start", 20.0, 80.0, 20.0, GRAY);
-        draw_text(
-            &format!("Health: {}", player.health),
-            screen_width() - 120.0,
-            screen_height() - 40.0,
-            24.0,
-            WHITE,
-        );
-        draw_text(
-            &format!("Pos: ({:.0}, {:.0})", player.pos.x, player.pos.y),
-            screen_width() - 120.0,
-            screen_height() - 20.0,
-            16.0,
-            GRAY,
-        );
-        draw_text(&format!("Score: {}", score), 20.0, 30.0, 24.0, WHITE);
 
         // wait for next frame
         next_frame().await

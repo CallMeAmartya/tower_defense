@@ -371,15 +371,30 @@ async fn main() {
             // find target
             if let Some(target_pos) = find_closest_enemy(player.pos, &enemies) {
                 // calculate direction to target
-                let direction = (target_pos - player.pos).normalize_or_zero();
-                // create projectile
-                projectiles.push(Projectile {
-                    pos: player.pos,
-                    velocity: direction * projectile_speed,
-                    damage: projectile_damage,
-                    radius: 6.0,
-                    lifetime: 2.0,
-                });
+                let base_direction = (target_pos - player.pos).normalize_or_zero();
+
+                // spread angle between projectiles
+                let spread = 0.2;
+                let total_spread = spread * (player.projectile_count - 1) as f32;
+                let start_angle = -total_spread / 2.0;
+
+                for i in 0..player.projectile_count {
+                    let angle = start_angle + spread * i as f32;
+
+                    // rotate direnction by angle
+                    let direction = Vec2::new(
+                        base_direction.x * angle.cos() - base_direction.y * angle.sin(),
+                        base_direction.x * angle.sin() + base_direction.y * angle.cos(),
+                    );
+                    // create projectile
+                    projectiles.push(Projectile {
+                        pos: player.pos,
+                        velocity: direction * projectile_speed,
+                        damage: player.damage,
+                        radius: 6.0,
+                        lifetime: 2.0,
+                    });
+                }
                 attack_timer = 0.0;
             }
         }
@@ -451,7 +466,7 @@ async fn main() {
             score = 0;
         }
 
-        // draw frame, player, enemies and projectiles
+        // draw frame, player, enemies, gates and projectiles
         clear_background(Color::from_rgba(20, 20, 30, 225));
         player.draw();
         for enemy in &enemies {
@@ -459,6 +474,9 @@ async fn main() {
         }
         for projectile in &projectiles {
             projectile.draw();
+        }
+        for gate in &upgrade_gates {
+            gate.draw();
         }
 
         // HUD

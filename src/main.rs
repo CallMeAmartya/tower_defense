@@ -7,6 +7,30 @@ enum GameState {
     GameOver,
 }
 
+struct Theme {
+    game_title: &'static str,
+    player_color: Color,
+    enemy_color: Color,
+
+    damage_upgrade_name: &'static str,
+    projectile_upgrade_name: &'static str,
+    slow_upgrade_name: &'static str,
+    health_upgrade_name: &'static str,
+    speed_upgrade_name: &'static str,
+}
+
+const VIKING_RUSH_THEME: Theme = Theme {
+    game_title: "Viking Rush",
+    player_color: Color::new(0.0, 0.66, 0.42, 1.0),
+    enemy_color: Color::new(0.24, 0.23, 0.43, 1.0),
+
+    damage_upgrade_name: "Hakarl Buff",
+    projectile_upgrade_name: "Viking heritage",
+    slow_upgrade_name: "Permafrost Trap",
+    health_upgrade_name: "Arctic Resilience",
+    speed_upgrade_name: "Sledge Dogs",
+};
+
 struct Player {
     pos: Vec2,
     speed: f32,
@@ -252,7 +276,7 @@ fn find_closest_enemy(player_pos: Vec2, enemies: &[Enemy]) -> Option<Vec2> {
     Some(closest_pos)
 }
 
-fn spawn_enemy() -> Enemy {
+fn spawn_enemy(wave: u32) -> Enemy {
     let side: i32 = rand::gen_range(0, 4);
 
     let pos: Vec2 = match side {
@@ -266,10 +290,13 @@ fn spawn_enemy() -> Enemy {
 
     let radius: f32 = 40.0 - (0.2 * speed);
 
+    // Scale stats with wave
+    let wave_multiplier = 1.0 + (wave as f32 - 1.0) * 0.1; // +10% per wave
+
     Enemy {
         pos,
-        speed: rand::gen_range(50.0, 80.0),
-        health: 30.0,
+        speed: rand::gen_range(50.0, 80.0) * wave_multiplier,
+        health: 30.0 * wave_multiplier,
         radius: radius,
     }
 }
@@ -320,6 +347,11 @@ fn apply_upgrade(upgrade_type: &UpgradeType, player: &mut Player, enemies: &mut 
     }
 }
 
+fn start_wave(wave: u32) -> u32 {
+    // return number of enemeies to spawn
+    10 + (wave.pow(2))
+}
+
 #[macroquad::main("TowerDefense")]
 async fn main() {
     let mut game_state = GameState::Menu;
@@ -351,6 +383,11 @@ async fn main() {
     let mut gate_spawn_timer = 0.0;
     let mut gate_spawn_interval = 5.0;
     let mut score: u32 = 0;
+
+    // enemy waves
+    let mut wave: u32 = 0;
+    let mut enemies_to_spawn: u32 = 0;
+    let mut wave_active: bool = false;
 
     loop {
         let dt = get_frame_time();
@@ -406,12 +443,21 @@ async fn main() {
             }
 
             GameState::Playing => {
+                // start a new wave if needed
+                if !wave_active || (enemies.is_empty() && enemies_to_spawn == 0) {
+                    wave += 1;
+                    enemies_to_spawn = start_wave(wave);
+                    wave_active = true;
+                    spawn_timer = 0.0;
+                    spawn_interval = 30.0 / (enemies_to_spawn as f32);
+                }
+
                 // spawn enemies
                 spawn_timer += dt;
-                if enemies.len() < 20 && spawn_timer >= spawn_interval {
-                    enemies.push(spawn_enemy());
+                if spawn_timer >= spawn_interval && enemies_to_spawn > 0 {
+                    enemies.push(spawn_enemy(wave));
                     spawn_timer = 0.0;
-                    spawn_interval -= 0.005;
+                    enemies_to_spawn -= 1;
                 }
 
                 // spawn upgrade gates

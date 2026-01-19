@@ -53,17 +53,17 @@ pub fn spawn_enemy(wave: u32) -> Enemy {
         _ => Vec2::new(screen_width() + 30.0, rand::gen_range(0.0, screen_height())), // right
     };
 
-    let speed: f32 = rand::gen_range(50.0, 150.0);
+    let speed: f32 = rand::gen_range(100.0, 150.0);
 
-    let radius: f32 = 40.0 - (0.2 * speed);
+    let radius: f32 = 60.0 - (0.3 * speed);
 
     // Scale stats with wave
-    let wave_multiplier = 1.0 + (wave as f32 - 1.0) * 0.1; // +10% per wave
+    let wave_multiplier = 1.0 + (wave as f32 - 1.0) * 1.0; // +100% per wave
 
     Enemy {
         pos,
         speed: rand::gen_range(50.0, 80.0) * wave_multiplier,
-        health: 30.0 * wave_multiplier,
+        health: 50.0 * wave_multiplier,
         radius: radius,
     }
 }

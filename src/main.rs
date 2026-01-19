@@ -32,7 +32,7 @@ fn start_wave(wave: u32) -> u32 {
     10 + (wave.pow(2))
 }
 
-#[macroquad::main("TowerDefense")]
+#[macroquad::main("VikingRush")]
 async fn main() {
     let theme = VIKING_RUSH_THEME;
     let mut game_state = GameState::Menu;

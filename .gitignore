@@ -4,5 +4,5 @@
 /.vs 
 
 # Github files except workflow
-/.github 
-!/ .github/workflows
+/.github/*
+!/.github/workflows

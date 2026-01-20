@@ -1,1 +1,8 @@
 /target
+
+# VS code files
+/.vs 
+
+# Github files except workflow
+/.github 
+!/ .github/workflows

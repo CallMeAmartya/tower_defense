@@ -61,7 +61,7 @@ async fn main() {
 
         match game_state {
             GameState::Menu => {
-                if is_key_pressed(KeyCode::Space) {
+                if is_key_pressed(KeyCode::Space) || touches().len() > 0 {
                     // start game
                     game_state = GameState::Playing;
                     player = Player::new();
@@ -192,7 +192,7 @@ async fn main() {
             }
 
             GameState::GameOver => {
-                if is_key_pressed(KeyCode::Space) {
+                if is_key_pressed(KeyCode::Space) || touches().len() > 0 {
                     game_state = GameState::Menu;
                 }
                 draw_game_over(score, wave);

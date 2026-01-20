@@ -27,18 +27,39 @@ impl Player {
     }
     // update player
     pub fn update(&mut self, dt: f32) {
+        let mut direction = Vec2::ZERO;
+
+        // Keyboard input
         if is_key_down(KeyCode::A) {
-            self.pos.x -= self.speed * dt;
+            direction.x -= 1.0;
         }
         if is_key_down(KeyCode::D) {
-            self.pos.x += self.speed * dt;
+            direction.x += 1.0;
         }
         if is_key_down(KeyCode::W) {
-            self.pos.y -= self.speed * dt;
+            direction.y -= 1.0;
         }
         if is_key_down(KeyCode::S) {
-            self.pos.y += self.speed * dt;
+            direction.y += 1.0;
         }
+
+        // Touch input (for mobile)
+        for touch in touches() {
+            if touch.phase == TouchPhase::Started || touch.phase == TouchPhase::Moved {
+                let touch_dir = touch.position - self.pos;
+                if touch_dir.length() > 30.0 {  // Dead zone
+                    direction = touch_dir.normalize();
+                }
+            }
+        }
+
+        // Apply movement
+        if direction != Vec2::ZERO {
+            direction = direction.normalize();
+            self.pos += direction * self.speed * dt;
+        }
+        
+        // Clamp to screen
         self.pos.x = self.pos.x.clamp(self.radius, screen_width() - self.radius);
         self.pos.y = self.pos.y.clamp(self.radius, screen_height() - self.radius);
     }

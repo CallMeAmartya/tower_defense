@@ -4,11 +4,15 @@ mod player;
 mod projectile;
 mod ui;
 mod upgrade;
+mod asset;
 
 use config::VIKING_RUSH_THEME;
 use enemy::Enemy;
 use enemy::find_closest_enemy;
 use enemy::spawn_enemy;
+use macroquad::audio::PlaySoundParams;
+use macroquad::audio::play_sound;
+use macroquad::audio::stop_sound;
 use macroquad::prelude::*;
 use player::Player;
 use projectile::Projectile;
@@ -19,6 +23,7 @@ use ui::draw_menu;
 use upgrade::UpgradeGate;
 use upgrade::apply_upgrade;
 use upgrade::spawn_upgrade_gate;
+use asset::Assets;
 
 #[derive(PartialEq)]
 enum GameState {
@@ -34,6 +39,11 @@ fn start_wave(wave: u32) -> u32 {
 
 #[macroquad::main("VikingRush")]
 async fn main() {
+    // Load assets
+    let assets = Assets::load().await;
+    // Play menu music
+    play_sound(&assets.menu_music, PlaySoundParams { looped: true, volume: 0.5 });
+
     let theme = VIKING_RUSH_THEME;
     let mut game_state = GameState::Menu;
 

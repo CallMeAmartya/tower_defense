@@ -1,10 +1,14 @@
 use macroquad::prelude::*;
+use crate::sprite::SpriteSheet;
 
 pub struct Enemy {
     pub pos: Vec2,
     pub speed: f32,
     pub health: f32,
     pub radius: f32,
+    pub anim_frame: usize,
+    pub anim_timer: f32,
+    pub facing_left: bool,
 }
 
 impl Enemy {
@@ -12,11 +16,26 @@ impl Enemy {
     pub fn update(&mut self, player_pos: Vec2, dt: f32) {
         let direction = (player_pos - self.pos).normalize_or_zero();
         self.pos += direction * self.speed * dt;
+
+        // Track facing direction based on movement toward player
+        if direction.x < 0.0 {
+            self.facing_left = true;
+        } else if direction.x > 0.0 {
+            self.facing_left = false;
+        }
+
+        // Advance animation
+        self.anim_timer += dt;
+        if self.anim_timer >= 0.12 {
+            self.anim_timer = 0.0;
+            self.anim_frame = (self.anim_frame + 1) % 8;
+        }
     }
 
-    // draw enemy
-    pub fn draw(&self) {
-        draw_circle(self.pos.x, self.pos.y, self.radius, RED);
+    // draw enemy using sprite sheet
+    pub fn draw(&self, sheet: &SpriteSheet) {
+        let dest_height = self.radius * 2.5;
+        sheet.draw_frame(self.anim_frame, 0, self.pos.x, self.pos.y, dest_height, self.facing_left);
     }
 
     pub fn is_alive(&self) -> bool {
@@ -64,6 +83,9 @@ pub fn spawn_enemy(wave: u32) -> Enemy {
         pos,
         speed: rand::gen_range(50.0, 80.0) * wave_multiplier,
         health: 50.0 * wave_multiplier,
-        radius: radius,
+        radius,
+        anim_frame: rand::gen_range(0, 8) as usize, // stagger animation start
+        anim_timer: 0.0,
+        facing_left: false,
     }
 }

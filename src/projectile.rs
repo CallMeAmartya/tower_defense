@@ -1,6 +1,7 @@
 use crate::enemy::Enemy;
 use crate::player::Player;
 use macroquad::prelude::*;
+
 pub struct Projectile {
     pub pos: Vec2,
     pub velocity: Vec2,
@@ -15,14 +16,20 @@ impl Projectile {
         self.lifetime -= dt;
     }
 
-    pub fn draw(&self) {
-        draw_circle(
-            self.pos.x,
-            self.pos.y,
-            self.radius * 1.5,
-            Color::from_rgba(255, 255, 100, 100),
+    pub fn draw(&self, texture: &Texture2D) {
+        let size = self.radius * 3.0;
+        let rotation = self.velocity.y.atan2(self.velocity.x);
+        draw_texture_ex(
+            texture,
+            self.pos.x - size / 2.0,
+            self.pos.y - size / 2.0,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(Vec2::new(size, size)),
+                rotation,
+                ..Default::default()
+            },
         );
-        draw_circle(self.pos.x, self.pos.y, self.radius, YELLOW);
     }
 
     pub fn hits(&self, enemy: &Enemy) -> bool {

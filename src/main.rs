@@ -2,6 +2,7 @@ mod config;
 mod enemy;
 mod player;
 mod projectile;
+mod sprite;
 mod ui;
 mod upgrade;
 mod asset;
@@ -189,12 +190,12 @@ async fn main() {
 
                 // draw frame, player, enemies, gates and projectiles
                 clear_background(Color::from_rgba(15, 20, 30, 255));
-                player.draw();
+                player.draw(&assets.viking_sheet);
                 for enemy in &enemies {
-                    enemy.draw();
+                    enemy.draw(&assets.soldier_sheet);
                 }
                 for projectile in &projectiles {
-                    projectile.draw();
+                    projectile.draw(&assets.knife_texture);
                 }
                 for gate in &upgrade_gates {
                     gate.draw();

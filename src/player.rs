@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use crate::sprite::SpriteSheet;
 
 pub struct Player {
     pub pos: Vec2,
@@ -9,6 +10,9 @@ pub struct Player {
     pub projectile_count: u32,
     pub projectile_speed: f32,
     pub radius: f32,
+    pub anim_frame: usize,
+    pub anim_timer: f32,
+    pub facing_left: bool,
 }
 
 impl Player {
@@ -23,6 +27,9 @@ impl Player {
             projectile_count: 1,
             projectile_speed: 200.0,
             radius: 20.0,
+            anim_frame: 0,
+            anim_timer: 0.0,
+            facing_left: false,
         }
     }
     // update player
@@ -57,16 +64,35 @@ impl Player {
         if direction != Vec2::ZERO {
             direction = direction.normalize();
             self.pos += direction * self.speed * dt;
+
+            // Track facing direction
+            if direction.x < 0.0 {
+                self.facing_left = true;
+            } else if direction.x > 0.0 {
+                self.facing_left = false;
+            }
+
+            // Advance animation while moving
+            self.anim_timer += dt;
+            if self.anim_timer >= 0.12 {
+                self.anim_timer = 0.0;
+                self.anim_frame = (self.anim_frame + 1) % 8;
+            }
+        } else {
+            // Reset to idle frame when standing still
+            self.anim_frame = 0;
+            self.anim_timer = 0.0;
         }
-        
+
         // Clamp to screen
         self.pos.x = self.pos.x.clamp(self.radius, screen_width() - self.radius);
         self.pos.y = self.pos.y.clamp(self.radius, screen_height() - self.radius);
     }
 
-    // draw player
-    pub fn draw(&self) {
-        draw_circle(self.pos.x, self.pos.y, self.radius, GREEN);
+    // draw player using sprite sheet
+    pub fn draw(&self, sheet: &SpriteSheet) {
+        let dest_height = self.radius * 2.5;
+        sheet.draw_frame(self.anim_frame, 0, self.pos.x, self.pos.y, dest_height, self.facing_left);
     }
 
     pub fn upgrade_damage(&mut self, amount: f32) {

@@ -74,6 +74,8 @@ async fn main() {
                 if is_key_pressed(KeyCode::Space) || touches().len() > 0 {
                     // start game
                     game_state = GameState::Playing;
+                    stop_sound(&assets.menu_music);
+                    play_sound(&assets.combat_music, PlaySoundParams { looped: true, volume: 0.5 });
                     player = Player::new();
                     enemies.clear();
                     projectiles.clear();
@@ -182,6 +184,7 @@ async fn main() {
                 // check game over
                 if player.health <= 0.0 {
                     game_state = GameState::GameOver;
+                    stop_sound(&assets.combat_music);
                 }
 
                 // draw frame, player, enemies, gates and projectiles
@@ -204,6 +207,7 @@ async fn main() {
             GameState::GameOver => {
                 if is_key_pressed(KeyCode::Space) || touches().len() > 0 {
                     game_state = GameState::Menu;
+                    play_sound(&assets.menu_music, PlaySoundParams { looped: true, volume: 0.5 });
                 }
                 draw_game_over(score, wave);
             }
